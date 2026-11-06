@@ -17,6 +17,7 @@ package org.springframework.security.crypto.bcrypt;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -442,6 +443,44 @@ public class BCryptTests {
 	@Test(expected = IllegalArgumentException.class)
 	public void hashpwFailsWhenSaltIsTooShort() {
 		BCrypt.hashpw("password", "$2a$10$123456789012345678901");
+	}
+
+	@Test
+	public void hashpwWorksWhenPasswordIsMaxLength() {
+		String password72chars = "123456789012345678901234567890123456789012345678901234567890123456789012";
+		String hashed = BCrypt.hashpw(password72chars, BCrypt.gensalt(4));
+		assertThat(BCrypt.checkpw(password72chars, hashed)).isTrue();
+	}
+
+	@Test(expected = IllegalArgumentException.class)
+	public void hashpwFailsWhenPasswordOverMaxLength() {
+		String password73chars = "1234567890123456789012345678901234567890123456789012345678901234567890123";
+		BCrypt.hashpw(password73chars, BCrypt.gensalt(4));
+	}
+
+	@Test(expected = IllegalArgumentException.class)
+	public void hashpwByteArrayFailsWhenPasswordOverMaxLength() {
+		BCrypt.hashpw(new byte[73], BCrypt.gensalt(4));
+	}
+
+	@Test(expected = IllegalArgumentException.class)
+	public void hashpwFailsWhenMultiByteCharsPasswordOverMaxLengthInBytes() {
+		// 37 two-byte characters = 74 bytes in UTF-8
+		StringBuilder password = new StringBuilder();
+		for (int i = 0; i < 37; i++) {
+			password.append('π');
+		}
+		BCrypt.hashpw(password.toString(), BCrypt.gensalt(4));
+	}
+
+	@Test
+	public void checkpwWhenPasswordOverMaxLengthThenAllowToMatch() {
+		// previously encoded passwords greater than 72 bytes must still be checked
+		String password73chars = "1234567890123456789012345678901234567890123456789012345678901234567890123";
+		String encodedPassword73chars = "$2a$10$1l9.kvQTsqNLiCYFqmKtQOHkp.BrgIrwsnTzWo9jdbQRbuBYQ/AVK";
+		assertThat(BCrypt.checkpw(password73chars, encodedPassword73chars)).isTrue();
+		assertThat(BCrypt.checkpw(password73chars.getBytes(StandardCharsets.UTF_8),
+				encodedPassword73chars)).isTrue();
 	}
 
 	@Test
